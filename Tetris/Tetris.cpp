@@ -4,8 +4,6 @@
 #include <utility>
 #include <random>
 
-// #include <bits/stdc++.h>
-
 #define SQUARES_QUANTITY_HORIZONTALLY 10
 #define SQUARES_QUANTITY_VERTICALLY 20
 
@@ -37,7 +35,6 @@ public:
         setFillColor(fillColor);
         setOutlineThickness(sideLength / SQUARE_OUTLINE_DIVIDER);
         setOutlineColor(sf::Color(164, 164, 164));
-        // setOrigin(sideLength/2, sideLength/2);
     }
 
     ~Square() {}
@@ -54,51 +51,78 @@ public:
     virtual bool CheckCollision(std::vector<Square>& stoppedSquares, sf::Vector2f offset) = 0;
     virtual void Spin(std::vector<Square>& stoppedSquares) = 0;
     virtual bool CheckCollisionForSpin(std::vector<Square>& squares, std::vector<Square>& stoppedSquares) = 0;
+
+    bool MoveDownCommon(std::vector<Square>& squares, sf::Vector2f& currentSquarePosition, std::vector<Square>& stoppedSquares) {
+        currentSquarePosition += sf::Vector2f(0, 1);
+        bool isCollisionHappened = false;
+        if (currentSquarePosition.y - squares[0].getPosition().y >= SQUARE_SIDE_LENGTH) {
+            isCollisionHappened = CheckCollision(stoppedSquares, sf::Vector2f(0, SQUARE_SIDE_LENGTH));
+            if (!isCollisionHappened) {
+                for (auto& square : squares) {
+                    square.setPosition(square.getPosition() + sf::Vector2f(0, SQUARE_SIDE_LENGTH));
+                }
+            }
+            currentSquarePosition = squares[0].getPosition();
+        }
+        return isCollisionHappened;
+    }
+
+    bool CheckCollisionCommon(std::vector<Square>& squares, std::vector<Square>& stoppedSquares, sf::Vector2f offset) {
+        for (const auto& square : squares) {
+            for (const auto& stoppedSquare : stoppedSquares) {
+                if (square.getPosition() + offset == stoppedSquare.getPosition()) {
+                    return true;
+                }
+            }
+            if (square.getPosition().y + offset.y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
+                return true;
+            }
+            if (square.getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
+                square.getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void SpinCommon(std::vector<Square>& squares, std::vector<Square>& stoppedSquares, std::vector<std::vector<sf::Vector2f>>& squaresOffsetPositionsDuringRotations,
+        int& currentSquaresOffsetPositionsDuringRotations, const std::vector<sf::Vector2f>& offsetDuringRotation,
+        int maxQuantityEnteredSquareCollisions) {
+        std::vector<Square> spinedSquares = squares;
+        if (currentSquaresOffsetPositionsDuringRotations == 3) {
+            currentSquaresOffsetPositionsDuringRotations = -1;
+        }
+        for (int i = 0; i < squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1].size(); i++) {
+            spinedSquares[i].setPosition(spinedSquares[i].getPosition() + squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1][i]);
+        }
+        for (int i = 0; i < offsetDuringRotation.size(); i++) {
+            for (int j = 0; j < maxQuantityEnteredSquareCollisions; j++) {
+                if (CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
+                    for (auto& spinedSquare : spinedSquares) {
+                        spinedSquare.setPosition(spinedSquare.getPosition() + offsetDuringRotation[i]);
+                    }
+                    if (!CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
+                        squares = spinedSquares;
+                        currentSquaresOffsetPositionsDuringRotations += 1;
+                        return;
+                    }
+                }
+                else {
+                    squares = spinedSquares;
+                    currentSquaresOffsetPositionsDuringRotations += 1;
+                    return;
+                }
+            }
+            for (auto& spinedSquare : spinedSquares) {
+                spinedSquare.setPosition(spinedSquare.getPosition() - sf::Vector2f(maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].x, maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].y));
+            }
+        }
+    }
 };
 
-class EmptyFigure : public BaseFigureType
+class SkyFigure : public BaseFigureType
 {
 public:
-    std::vector<Square> squares;
-
-    sf::Vector2f currentSquarePosition = sf::Vector2f(
-        LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 3 * SQUARE_SIDE_LENGTH,
-        TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX
-    );
-
-    virtual std::vector<Square>& GetSquares() { return squares; }
-    virtual sf::Vector2f GetCurrentPosition() { return currentSquarePosition; }
-    virtual void SetCurrentPosition(sf::Vector2f newCurrentPosition) {}
-
-    virtual bool MoveDown(std::vector<Square>& stoppedSquares) { return false; }
-    virtual bool CheckCollision(std::vector<Square>& stoppedSquares, sf::Vector2f offset) { return false; }
-    virtual void Spin(std::vector<Square>& stoppedSquares) {}
-    virtual bool CheckCollisionForSpin(std::vector<Square>& squares, std::vector<Square>& stoppedSquares) { return false; }
-
-    EmptyFigure() {
-        squares = {};
-    }
-
-    ~EmptyFigure() {}
-};
-
-class SkyFigure: public BaseFigureType
-{
-public:
-    std::vector<Square> squares;
-
-    std::vector<Square>& GetSquares() override {
-        return squares;
-    }
-
-    sf::Vector2f GetCurrentPosition() override {
-        return currentSquarePosition;
-    }
-
-    void SetCurrentPosition(sf::Vector2f newCurrentPosition) override {
-        currentSquarePosition = newCurrentPosition;
-    }
-
     std::vector<std::vector<sf::Vector2f>> squaresOffsetPositionsDuringRotations =
     {
         {
@@ -127,9 +151,6 @@ public:
         }
     };
 
-    int currentSquaresOffsetPositionsDuringRotations;
-    int maxQuantityEnteredSquareCollisions;
-
     std::vector<sf::Vector2f> offsetDuringRotation =
     {
         sf::Vector2f(-SQUARE_SIDE_LENGTH, 0),
@@ -138,12 +159,13 @@ public:
         sf::Vector2f(0, SQUARE_SIDE_LENGTH)
     };
 
-    sf::Vector2f currentSquarePosition = sf::Vector2f(
-        LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 3 * SQUARE_SIDE_LENGTH,
-        TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX
-    );
+    std::vector<Square> squares;
+    int currentSquaresOffsetPositionsDuringRotations;
+    int maxQuantityEnteredSquareCollisions;
+    sf::Vector2f currentSquarePosition;
 
-    SkyFigure() {
+    SkyFigure() : currentSquarePosition(LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 3 * SQUARE_SIDE_LENGTH,
+        TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX) {
         squares.push_back(Square(currentSquarePosition, sf::Vector2f(0, 0), sf::Color(66, 170, 255)));
         squares.push_back(Square(currentSquarePosition, sf::Vector2f(1, 0), sf::Color(66, 170, 255)));
         squares.push_back(Square(currentSquarePosition, sf::Vector2f(2, 0), sf::Color(66, 170, 255)));
@@ -152,109 +174,57 @@ public:
         maxQuantityEnteredSquareCollisions = 2;
     }
 
+    std::vector<Square>& GetSquares() override { return squares; }
+    sf::Vector2f GetCurrentPosition() override { return currentSquarePosition; }
+    void SetCurrentPosition(sf::Vector2f newCurrentPosition) override { currentSquarePosition = newCurrentPosition; }
+
     bool MoveDown(std::vector<Square>& stoppedSquares) override {
-        currentSquarePosition += sf::Vector2f(0, 1);
-        bool isCollisionHappend = false;
-        if (currentSquarePosition.y - squares[0].getPosition().y >= SQUARE_SIDE_LENGTH) {
-            isCollisionHappend = CheckCollision(stoppedSquares, sf::Vector2f(0, SQUARE_SIDE_LENGTH));
-            if (!isCollisionHappend) {
-                for (int i = 0; i < squares.size(); i++) {
-                    squares[i].setPosition(squares[i].getPosition() + sf::Vector2f(0, SQUARE_SIDE_LENGTH));
-                }
-            }
-            currentSquarePosition = squares[0].getPosition();
-        }
-        return isCollisionHappend;
+        return MoveDownCommon(squares, currentSquarePosition, stoppedSquares);
     }
 
     bool CheckCollision(std::vector<Square>& stoppedSquares, sf::Vector2f offset) override {
-        for (int i = 0; i < squares.size(); i++) {
-            for (int j = 0; j < stoppedSquares.size(); j++) {
-                if (squares[i].getPosition() + offset == stoppedSquares[j].getPosition()) {
-                    return true;
-                }
-            }
-            if (squares[i].getPosition().y + offset.y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-
-            if (squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
-                squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-        }
-        return false;
+        return CheckCollisionCommon(squares, stoppedSquares, offset);
     }
 
     void Spin(std::vector<Square>& stoppedSquares) override {
-        std::vector<Square> spinedSquares = squares;
-        if (currentSquaresOffsetPositionsDuringRotations == 3) {
-            currentSquaresOffsetPositionsDuringRotations = -1;
-        }
-        for (int i = 0; i < squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1].size(); i++) {
-            spinedSquares[i].setPosition(spinedSquares[i].getPosition() + squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1][i]);
-        }
-        for (int i = 0; i < offsetDuringRotation.size(); i++) {
-            for (int j = 0; j < maxQuantityEnteredSquareCollisions; j++) {
-                if (CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
-                    for (int k = 0; k < spinedSquares.size(); k++) {
-                        spinedSquares[k].setPosition(spinedSquares[k].getPosition() + offsetDuringRotation[i]);
-                    }
-                    if (!CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
-                        squares = spinedSquares;
-                        currentSquaresOffsetPositionsDuringRotations += 1;
-                        return;
-                    }
-                }
-                else {
-                    squares = spinedSquares;
-                    currentSquaresOffsetPositionsDuringRotations += 1;
-                    return;
-                }
-            }
-            for (int k = 0; k < spinedSquares.size(); k++) {
-                spinedSquares[k].setPosition(spinedSquares[k].getPosition() - sf::Vector2f(maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].x, maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].y));
-            }
-        }
+        SpinCommon(squares, stoppedSquares, squaresOffsetPositionsDuringRotations, currentSquaresOffsetPositionsDuringRotations, offsetDuringRotation, maxQuantityEnteredSquareCollisions);
     }
 
     bool CheckCollisionForSpin(std::vector<Square>& squares, std::vector<Square>& stoppedSquares) override {
-        for (int i = 0; i < squares.size(); i++) {
-            for (int j = 0; j < stoppedSquares.size(); j++) {
-                if (squares[i].getPosition() == stoppedSquares[j].getPosition()) {
-                    return true;
-                }
-            }
-
-            if (squares[i].getPosition().y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-
-            if (squares[i].getPosition().x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
-                squares[i].getPosition().x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-        }
-        return false;
+        return CheckCollisionCommon(squares, stoppedSquares, sf::Vector2f(0, 0));
     }
 };
 
-class YellowFigure: public BaseFigureType
+class EmptyFigure : public BaseFigureType
 {
 public:
     std::vector<Square> squares;
 
-    std::vector<Square>& GetSquares() override {
-        return squares;
+    sf::Vector2f currentSquarePosition = sf::Vector2f(
+        LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 3 * SQUARE_SIDE_LENGTH,
+        TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX
+    );
+
+    virtual std::vector<Square>& GetSquares() { return squares; }
+    virtual sf::Vector2f GetCurrentPosition() { return currentSquarePosition; }
+    virtual void SetCurrentPosition(sf::Vector2f newCurrentPosition) {}
+
+    virtual bool MoveDown(std::vector<Square>& stoppedSquares) { return false; }
+    virtual bool CheckCollision(std::vector<Square>& stoppedSquares, sf::Vector2f offset) { return false; }
+    virtual void Spin(std::vector<Square>& stoppedSquares) {}
+    virtual bool CheckCollisionForSpin(std::vector<Square>& squares, std::vector<Square>& stoppedSquares) { return false; }
+
+    EmptyFigure() {
+        squares = {};
     }
 
-    sf::Vector2f GetCurrentPosition() override {
-        return currentSquarePosition;
-    }
+    ~EmptyFigure() {}
+};
 
-    void SetCurrentPosition(sf::Vector2f newCurrentPosition) override {
-        currentSquarePosition = newCurrentPosition;
-    }
+class YellowFigure : public BaseFigureType
+{
+public:
+    std::vector<Square> squares;
 
     std::vector<std::vector<sf::Vector2f>> squaresOffsetPositionsDuringRotations =
     {
@@ -300,7 +270,8 @@ public:
         TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX
     );
 
-    YellowFigure() {
+    YellowFigure()
+    {
         squares.push_back(Square(currentSquarePosition, sf::Vector2f(0, 0), sf::Color::Yellow));
         squares.push_back(Square(currentSquarePosition, sf::Vector2f(1, 0), sf::Color::Yellow));
         squares.push_back(Square(currentSquarePosition, sf::Vector2f(1, 1), sf::Color::Yellow));
@@ -309,90 +280,39 @@ public:
         maxQuantityEnteredSquareCollisions = 0;
     }
 
-    bool MoveDown(std::vector<Square>& stoppedSquares) override {
-        currentSquarePosition += sf::Vector2f(0, 1);
-        bool isCollisionHappend = false;
-        if (currentSquarePosition.y - squares[0].getPosition().y >= SQUARE_SIDE_LENGTH) {
-            isCollisionHappend = CheckCollision(stoppedSquares, sf::Vector2f(0, SQUARE_SIDE_LENGTH));
-            if (!isCollisionHappend) {
-                for (int i = 0; i < squares.size(); i++) {
-                    squares[i].setPosition(squares[i].getPosition() + sf::Vector2f(0, SQUARE_SIDE_LENGTH));
-                }
-            }
-            currentSquarePosition = squares[0].getPosition();
-        }
-        return isCollisionHappend;
+    std::vector<Square>& GetSquares() override
+    {
+        return squares;
     }
 
-    bool CheckCollision(std::vector<Square>& stoppedSquares, sf::Vector2f offset) override {
-        for (int i = 0; i < squares.size(); i++) {
-            for (int j = 0; j < stoppedSquares.size(); j++) {
-                if (squares[i].getPosition() + offset == stoppedSquares[j].getPosition()) {
-                    return true;
-                }
-            }
-            if (squares[i].getPosition().y + offset.y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-
-            if (squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
-                squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-        }
-        return false;
+    sf::Vector2f GetCurrentPosition() override
+    {
+        return currentSquarePosition;
     }
 
-    void Spin(std::vector<Square>& stoppedSquares) override {
-        std::vector<Square> spinedSquares = squares;
-        if (currentSquaresOffsetPositionsDuringRotations == 3) {
-            currentSquaresOffsetPositionsDuringRotations = -1;
-        }
-        for (int i = 0; i < squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1].size(); i++) {
-            spinedSquares[i].setPosition(spinedSquares[i].getPosition() + squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1][i]);
-        }
-        for (int i = 0; i < offsetDuringRotation.size(); i++) {
-            for (int j = 0; j < maxQuantityEnteredSquareCollisions; j++) {
-                if (CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
-                    for (int k = 0; k < spinedSquares.size(); k++) {
-                        spinedSquares[k].setPosition(spinedSquares[k].getPosition() + offsetDuringRotation[i]);
-                    }
-                    if (!CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
-                        squares = spinedSquares;
-                        currentSquaresOffsetPositionsDuringRotations += 1;
-                        return;
-                    }
-                }
-                else {
-                    squares = spinedSquares;
-                    currentSquaresOffsetPositionsDuringRotations += 1;
-                    return;
-                }
-            }
-            for (int k = 0; k < spinedSquares.size(); k++) {
-                spinedSquares[k].setPosition(spinedSquares[k].getPosition() - sf::Vector2f(maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].x, maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].y));
-            }
-        }
+    void SetCurrentPosition(sf::Vector2f newCurrentPosition) override
+    {
+        currentSquarePosition = newCurrentPosition;
     }
 
-    bool CheckCollisionForSpin(std::vector<Square>& squares, std::vector<Square>& stoppedSquares) override {
-        for (int i = 0; i < squares.size(); i++) {
-            for (int j = 0; j < stoppedSquares.size(); j++) {
-                if (squares[i].getPosition() == stoppedSquares[j].getPosition()) {
-                    return true;
-                }
-            }
+    bool MoveDown(std::vector<Square>& stoppedSquares) override
+    {
+        return MoveDownCommon(squares, currentSquarePosition, stoppedSquares);
+    }
 
-            if (squares[i].getPosition().y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
+    bool CheckCollision(std::vector<Square>& stoppedSquares, sf::Vector2f offset) override
+    {
+        return CheckCollisionCommon(squares, stoppedSquares, offset);
+    }
 
-            if (squares[i].getPosition().x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
-                squares[i].getPosition().x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-        }
-        return false;
+    void Spin(std::vector<Square>& stoppedSquares) override
+    {
+        SpinCommon(squares, stoppedSquares, squaresOffsetPositionsDuringRotations, currentSquaresOffsetPositionsDuringRotations, offsetDuringRotation, maxQuantityEnteredSquareCollisions);
+    }
+
+    bool CheckCollisionForSpin(std::vector<Square>& squares, std::vector<Square>& stoppedSquares) override
+    {
+        return CheckCollisionCommon(squares, stoppedSquares, sf::Vector2f(0, 0));
     }
 };
 
@@ -467,89 +387,19 @@ public:
     }
 
     bool MoveDown(std::vector<Square>& stoppedSquares) override {
-        currentSquarePosition += sf::Vector2f(0, 1);
-        bool isCollisionHappend = false;
-        if (currentSquarePosition.y - squares[0].getPosition().y >= SQUARE_SIDE_LENGTH) {
-            isCollisionHappend = CheckCollision(stoppedSquares, sf::Vector2f(0, SQUARE_SIDE_LENGTH));
-            if (!isCollisionHappend) {
-                for (int i = 0; i < squares.size(); i++) {
-                    squares[i].setPosition(squares[i].getPosition() + sf::Vector2f(0, SQUARE_SIDE_LENGTH));
-                }
-            }
-            currentSquarePosition = squares[0].getPosition();
-        }
-        return isCollisionHappend;
+        return MoveDownCommon(squares, currentSquarePosition, stoppedSquares);
     }
 
     bool CheckCollision(std::vector<Square>& stoppedSquares, sf::Vector2f offset) override {
-        for (int i = 0; i < squares.size(); i++) {
-            for (int j = 0; j < stoppedSquares.size(); j++) {
-                if (squares[i].getPosition() + offset == stoppedSquares[j].getPosition()) {
-                    return true;
-                }
-            }
-            if (squares[i].getPosition().y + offset.y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-
-            if (squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
-                squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-        }
-        return false;
+        return CheckCollisionCommon(squares, stoppedSquares, offset);
     }
 
     void Spin(std::vector<Square>& stoppedSquares) override {
-        std::vector<Square> spinedSquares = squares;
-        if (currentSquaresOffsetPositionsDuringRotations == 3) {
-            currentSquaresOffsetPositionsDuringRotations = -1;
-        }
-        for (int i = 0; i < squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1].size(); i++) {
-            spinedSquares[i].setPosition(spinedSquares[i].getPosition() + squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1][i]);
-        }
-        for (int i = 0; i < offsetDuringRotation.size(); i++) {
-            for (int j = 0; j < maxQuantityEnteredSquareCollisions; j++) {
-                if (CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
-                    for (int k = 0; k < spinedSquares.size(); k++) {
-                        spinedSquares[k].setPosition(spinedSquares[k].getPosition() + offsetDuringRotation[i]);
-                    }
-                    if (!CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
-                        squares = spinedSquares;
-                        currentSquaresOffsetPositionsDuringRotations += 1;
-                        return;
-                    }
-                }
-                else {
-                    squares = spinedSquares;
-                    currentSquaresOffsetPositionsDuringRotations += 1;
-                    return;
-                }
-            }
-            for (int k = 0; k < spinedSquares.size(); k++) {
-                spinedSquares[k].setPosition(spinedSquares[k].getPosition() - sf::Vector2f(maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].x, maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].y));
-            }
-        }
+        SpinCommon(squares, stoppedSquares, squaresOffsetPositionsDuringRotations, currentSquaresOffsetPositionsDuringRotations, offsetDuringRotation, maxQuantityEnteredSquareCollisions);
     }
 
     bool CheckCollisionForSpin(std::vector<Square>& squares, std::vector<Square>& stoppedSquares) override {
-        for (int i = 0; i < squares.size(); i++) {
-            for (int j = 0; j < stoppedSquares.size(); j++) {
-                if (squares[i].getPosition() == stoppedSquares[j].getPosition()) {
-                    return true;
-                }
-            }
-
-            if (squares[i].getPosition().y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-
-            if (squares[i].getPosition().x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
-                squares[i].getPosition().x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-        }
-        return false;
+        return CheckCollisionCommon(squares, stoppedSquares, sf::Vector2f(0, 0));
     }
 };
 
@@ -579,7 +429,7 @@ public:
             sf::Vector2f(-SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH)
         },
         {
-            sf::Vector2f(0, 2* SQUARE_SIDE_LENGTH),
+            sf::Vector2f(0, 2 * SQUARE_SIDE_LENGTH),
             sf::Vector2f(SQUARE_SIDE_LENGTH, SQUARE_SIDE_LENGTH),
             sf::Vector2f(0, 0),
             sf::Vector2f(-SQUARE_SIDE_LENGTH, -SQUARE_SIDE_LENGTH)
@@ -624,89 +474,19 @@ public:
     }
 
     bool MoveDown(std::vector<Square>& stoppedSquares) override {
-        currentSquarePosition += sf::Vector2f(0, 1);
-        bool isCollisionHappend = false;
-        if (currentSquarePosition.y - squares[0].getPosition().y >= SQUARE_SIDE_LENGTH) {
-            isCollisionHappend = CheckCollision(stoppedSquares, sf::Vector2f(0, SQUARE_SIDE_LENGTH));
-            if (!isCollisionHappend) {
-                for (int i = 0; i < squares.size(); i++) {
-                    squares[i].setPosition(squares[i].getPosition() + sf::Vector2f(0, SQUARE_SIDE_LENGTH));
-                }
-            }
-            currentSquarePosition = squares[0].getPosition();
-        }
-        return isCollisionHappend;
+        return MoveDownCommon(squares, currentSquarePosition, stoppedSquares);
     }
 
     bool CheckCollision(std::vector<Square>& stoppedSquares, sf::Vector2f offset) override {
-        for (int i = 0; i < squares.size(); i++) {
-            for (int j = 0; j < stoppedSquares.size(); j++) {
-                if (squares[i].getPosition() + offset == stoppedSquares[j].getPosition()) {
-                    return true;
-                }
-            }
-            if (squares[i].getPosition().y + offset.y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-
-            if (squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
-                squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-        }
-        return false;
+        return CheckCollisionCommon(squares, stoppedSquares, offset);
     }
 
     void Spin(std::vector<Square>& stoppedSquares) override {
-        std::vector<Square> spinedSquares = squares;
-        if (currentSquaresOffsetPositionsDuringRotations == 3) {
-            currentSquaresOffsetPositionsDuringRotations = -1;
-        }
-        for (int i = 0; i < squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1].size(); i++) {
-            spinedSquares[i].setPosition(spinedSquares[i].getPosition() + squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1][i]);
-        }
-        for (int i = 0; i < offsetDuringRotation.size(); i++) {
-            for (int j = 0; j < maxQuantityEnteredSquareCollisions; j++) {
-                if (CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
-                    for (int k = 0; k < spinedSquares.size(); k++) {
-                        spinedSquares[k].setPosition(spinedSquares[k].getPosition() + offsetDuringRotation[i]);
-                    }
-                    if (!CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
-                        squares = spinedSquares;
-                        currentSquaresOffsetPositionsDuringRotations += 1;
-                        return;
-                    }
-                }
-                else {
-                    squares = spinedSquares;
-                    currentSquaresOffsetPositionsDuringRotations += 1;
-                    return;
-                }
-            }
-            for (int k = 0; k < spinedSquares.size(); k++) {
-                spinedSquares[k].setPosition(spinedSquares[k].getPosition() - sf::Vector2f(maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].x, maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].y));
-            }
-        }
+        SpinCommon(squares, stoppedSquares, squaresOffsetPositionsDuringRotations, currentSquaresOffsetPositionsDuringRotations, offsetDuringRotation, maxQuantityEnteredSquareCollisions);
     }
 
     bool CheckCollisionForSpin(std::vector<Square>& squares, std::vector<Square>& stoppedSquares) override {
-        for (int i = 0; i < squares.size(); i++) {
-            for (int j = 0; j < stoppedSquares.size(); j++) {
-                if (squares[i].getPosition() == stoppedSquares[j].getPosition()) {
-                    return true;
-                }
-            }
-
-            if (squares[i].getPosition().y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-
-            if (squares[i].getPosition().x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
-                squares[i].getPosition().x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-        }
-        return false;
+        return CheckCollisionCommon(squares, stoppedSquares, sf::Vector2f(0, 0));
     }
 };
 
@@ -781,109 +561,25 @@ public:
     }
 
     bool MoveDown(std::vector<Square>& stoppedSquares) override {
-        currentSquarePosition += sf::Vector2f(0, 1);
-        bool isCollisionHappend = false;
-        if (currentSquarePosition.y - squares[0].getPosition().y >= SQUARE_SIDE_LENGTH) {
-            isCollisionHappend = CheckCollision(stoppedSquares, sf::Vector2f(0, SQUARE_SIDE_LENGTH));
-            if (!isCollisionHappend) {
-                for (int i = 0; i < squares.size(); i++) {
-                    squares[i].setPosition(squares[i].getPosition() + sf::Vector2f(0, SQUARE_SIDE_LENGTH));
-                }
-            }
-            currentSquarePosition = squares[0].getPosition();
-        }
-        return isCollisionHappend;
+        return MoveDownCommon(squares, currentSquarePosition, stoppedSquares);
     }
 
     bool CheckCollision(std::vector<Square>& stoppedSquares, sf::Vector2f offset) override {
-        for (int i = 0; i < squares.size(); i++) {
-            for (int j = 0; j < stoppedSquares.size(); j++) {
-                if (squares[i].getPosition() + offset == stoppedSquares[j].getPosition()) {
-                    return true;
-                }
-            }
-            if (squares[i].getPosition().y + offset.y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-
-            if (squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
-                squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-        }
-        return false;
+        return CheckCollisionCommon(squares, stoppedSquares, offset);
     }
 
     void Spin(std::vector<Square>& stoppedSquares) override {
-        std::vector<Square> spinedSquares = squares;
-        if (currentSquaresOffsetPositionsDuringRotations == 3) {
-            currentSquaresOffsetPositionsDuringRotations = -1;
-        }
-        for (int i = 0; i < squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1].size(); i++) {
-            spinedSquares[i].setPosition(spinedSquares[i].getPosition() + squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1][i]);
-        }
-        for (int i = 0; i < offsetDuringRotation.size(); i++) {
-            for (int j = 0; j < maxQuantityEnteredSquareCollisions; j++) {
-                if (CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
-                    for (int k = 0; k < spinedSquares.size(); k++) {
-                        spinedSquares[k].setPosition(spinedSquares[k].getPosition() + offsetDuringRotation[i]);
-                    }
-                    if (!CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
-                        squares = spinedSquares;
-                        currentSquaresOffsetPositionsDuringRotations += 1;
-                        return;
-                    }
-                }
-                else {
-                    squares = spinedSquares;
-                    currentSquaresOffsetPositionsDuringRotations += 1;
-                    return;
-                }
-            }
-            for (int k = 0; k < spinedSquares.size(); k++) {
-                spinedSquares[k].setPosition(spinedSquares[k].getPosition() - sf::Vector2f(maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].x, maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].y));
-            }
-        }
+        SpinCommon(squares, stoppedSquares, squaresOffsetPositionsDuringRotations, currentSquaresOffsetPositionsDuringRotations, offsetDuringRotation, maxQuantityEnteredSquareCollisions);
     }
 
     bool CheckCollisionForSpin(std::vector<Square>& squares, std::vector<Square>& stoppedSquares) override {
-        for (int i = 0; i < squares.size(); i++) {
-            for (int j = 0; j < stoppedSquares.size(); j++) {
-                if (squares[i].getPosition() == stoppedSquares[j].getPosition()) {
-                    return true;
-                }
-            }
-
-            if (squares[i].getPosition().y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-
-            if (squares[i].getPosition().x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
-                squares[i].getPosition().x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-        }
-        return false;
+        return CheckCollisionCommon(squares, stoppedSquares, sf::Vector2f(0, 0));
     }
 };
 
 class GreenFigure : public BaseFigureType
 {
 public:
-    std::vector<Square> squares;
-
-    std::vector<Square>& GetSquares() override {
-        return squares;
-    }
-
-    sf::Vector2f GetCurrentPosition() override {
-        return currentSquarePosition;
-    }
-
-    void SetCurrentPosition(sf::Vector2f newCurrentPosition) override {
-        currentSquarePosition = newCurrentPosition;
-    }
-
     std::vector<std::vector<sf::Vector2f>> squaresOffsetPositionsDuringRotations =
     {
         {
@@ -912,9 +608,6 @@ public:
         }
     };
 
-    int currentSquaresOffsetPositionsDuringRotations;
-    int maxQuantityEnteredSquareCollisions;
-
     std::vector<sf::Vector2f> offsetDuringRotation =
     {
         sf::Vector2f(-SQUARE_SIDE_LENGTH, 0),
@@ -923,12 +616,14 @@ public:
         sf::Vector2f(0, SQUARE_SIDE_LENGTH)
     };
 
-    sf::Vector2f currentSquarePosition = sf::Vector2f(
-        LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 3 * SQUARE_SIDE_LENGTH,
-        TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX
-    );
+    std::vector<Square> squares;
+    int currentSquaresOffsetPositionsDuringRotations;
+    int maxQuantityEnteredSquareCollisions;
+    sf::Vector2f currentSquarePosition;
 
-    GreenFigure() {
+    GreenFigure() : currentSquarePosition(LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 3 * SQUARE_SIDE_LENGTH,
+        TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX)
+    {
         squares.push_back(Square(currentSquarePosition, sf::Vector2f(1, 0), sf::Color::Green));
         squares.push_back(Square(currentSquarePosition, sf::Vector2f(2, 0), sf::Color::Green));
         squares.push_back(Square(currentSquarePosition, sf::Vector2f(0, 1), sf::Color::Green));
@@ -937,90 +632,24 @@ public:
         maxQuantityEnteredSquareCollisions = 1;
     }
 
+    std::vector<Square>& GetSquares() override { return squares; }
+    sf::Vector2f GetCurrentPosition() override { return currentSquarePosition; }
+    void SetCurrentPosition(sf::Vector2f newCurrentPosition) override { currentSquarePosition = newCurrentPosition; }
+
     bool MoveDown(std::vector<Square>& stoppedSquares) override {
-        currentSquarePosition += sf::Vector2f(0, 1);
-        bool isCollisionHappend = false;
-        if (currentSquarePosition.y - squares[0].getPosition().y >= SQUARE_SIDE_LENGTH) {
-            isCollisionHappend = CheckCollision(stoppedSquares, sf::Vector2f(0, SQUARE_SIDE_LENGTH));
-            if (!isCollisionHappend) {
-                for (int i = 0; i < squares.size(); i++) {
-                    squares[i].setPosition(squares[i].getPosition() + sf::Vector2f(0, SQUARE_SIDE_LENGTH));
-                }
-            }
-            currentSquarePosition = squares[0].getPosition();
-        }
-        return isCollisionHappend;
+        return MoveDownCommon(squares, currentSquarePosition, stoppedSquares);
     }
 
     bool CheckCollision(std::vector<Square>& stoppedSquares, sf::Vector2f offset) override {
-        for (int i = 0; i < squares.size(); i++) {
-            for (int j = 0; j < stoppedSquares.size(); j++) {
-                if (squares[i].getPosition() + offset == stoppedSquares[j].getPosition()) {
-                    return true;
-                }
-            }
-            if (squares[i].getPosition().y + offset.y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-
-            if (squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
-                squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-        }
-        return false;
+        return CheckCollisionCommon(squares, stoppedSquares, offset);
     }
 
     void Spin(std::vector<Square>& stoppedSquares) override {
-        std::vector<Square> spinedSquares = squares;
-        if (currentSquaresOffsetPositionsDuringRotations == 3) {
-            currentSquaresOffsetPositionsDuringRotations = -1;
-        }
-        for (int i = 0; i < squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1].size(); i++) {
-            spinedSquares[i].setPosition(spinedSquares[i].getPosition() + squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1][i]);
-        }
-        for (int i = 0; i < offsetDuringRotation.size(); i++) {
-            for (int j = 0; j < maxQuantityEnteredSquareCollisions; j++) {
-                if (CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
-                    for (int k = 0; k < spinedSquares.size(); k++) {
-                        spinedSquares[k].setPosition(spinedSquares[k].getPosition() + offsetDuringRotation[i]);
-                    }
-                    if (!CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
-                        squares = spinedSquares;
-                        currentSquaresOffsetPositionsDuringRotations += 1;
-                        return;
-                    }
-                }
-                else {
-                    squares = spinedSquares;
-                    currentSquaresOffsetPositionsDuringRotations += 1;
-                    return;
-                }
-            }
-            for (int k = 0; k < spinedSquares.size(); k++) {
-                spinedSquares[k].setPosition(spinedSquares[k].getPosition() - sf::Vector2f(maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].x, maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].y));
-            }
-        }
+        SpinCommon(squares, stoppedSquares, squaresOffsetPositionsDuringRotations, currentSquaresOffsetPositionsDuringRotations, offsetDuringRotation, maxQuantityEnteredSquareCollisions);
     }
 
     bool CheckCollisionForSpin(std::vector<Square>& squares, std::vector<Square>& stoppedSquares) override {
-        for (int i = 0; i < squares.size(); i++) {
-            for (int j = 0; j < stoppedSquares.size(); j++) {
-                if (squares[i].getPosition() == stoppedSquares[j].getPosition()) {
-                    return true;
-                }
-            }
-
-            if (squares[i].getPosition().y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-
-            if (squares[i].getPosition().x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
-                squares[i].getPosition().x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-        }
-        return false;
+        return CheckCollisionCommon(squares, stoppedSquares, sf::Vector2f(0, 0));
     }
 };
 
@@ -1095,89 +724,19 @@ public:
     }
 
     bool MoveDown(std::vector<Square>& stoppedSquares) override {
-        currentSquarePosition += sf::Vector2f(0, 1);
-        bool isCollisionHappend = false;
-        if (currentSquarePosition.y - squares[0].getPosition().y >= SQUARE_SIDE_LENGTH) {
-            isCollisionHappend = CheckCollision(stoppedSquares, sf::Vector2f(0, SQUARE_SIDE_LENGTH));
-            if (!isCollisionHappend) {
-                for (int i = 0; i < squares.size(); i++) {
-                    squares[i].setPosition(squares[i].getPosition() + sf::Vector2f(0, SQUARE_SIDE_LENGTH));
-                }
-            }
-            currentSquarePosition = squares[0].getPosition();
-        }
-        return isCollisionHappend;
+        return MoveDownCommon(squares, currentSquarePosition, stoppedSquares);
     }
 
     bool CheckCollision(std::vector<Square>& stoppedSquares, sf::Vector2f offset) override {
-        for (int i = 0; i < squares.size(); i++) {
-            for (int j = 0; j < stoppedSquares.size(); j++) {
-                if (squares[i].getPosition() + offset == stoppedSquares[j].getPosition()) {
-                    return true;
-                }
-            }
-            if (squares[i].getPosition().y + offset.y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-
-            if (squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
-                squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-        }
-        return false;
+        return CheckCollisionCommon(squares, stoppedSquares, offset);
     }
 
     void Spin(std::vector<Square>& stoppedSquares) override {
-        std::vector<Square> spinedSquares = squares;
-        if (currentSquaresOffsetPositionsDuringRotations == 3) {
-            currentSquaresOffsetPositionsDuringRotations = -1;
-        }
-        for (int i = 0; i < squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1].size(); i++) {
-            spinedSquares[i].setPosition(spinedSquares[i].getPosition() + squaresOffsetPositionsDuringRotations[currentSquaresOffsetPositionsDuringRotations + 1][i]);
-        }
-        for (int i = 0; i < offsetDuringRotation.size(); i++) {
-            for (int j = 0; j < maxQuantityEnteredSquareCollisions; j++) {
-                if (CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
-                    for (int k = 0; k < spinedSquares.size(); k++) {
-                        spinedSquares[k].setPosition(spinedSquares[k].getPosition() + offsetDuringRotation[i]);
-                    }
-                    if (!CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
-                        squares = spinedSquares;
-                        currentSquaresOffsetPositionsDuringRotations += 1;
-                        return;
-                    }
-                }
-                else {
-                    squares = spinedSquares;
-                    currentSquaresOffsetPositionsDuringRotations += 1;
-                    return;
-                }
-            }
-            for (int k = 0; k < spinedSquares.size(); k++) {
-                spinedSquares[k].setPosition(spinedSquares[k].getPosition() - sf::Vector2f(maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].x, maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].y));
-            }
-        }
+        SpinCommon(squares, stoppedSquares, squaresOffsetPositionsDuringRotations, currentSquaresOffsetPositionsDuringRotations, offsetDuringRotation, maxQuantityEnteredSquareCollisions);
     }
 
     bool CheckCollisionForSpin(std::vector<Square>& squares, std::vector<Square>& stoppedSquares) override {
-        for (int i = 0; i < squares.size(); i++) {
-            for (int j = 0; j < stoppedSquares.size(); j++) {
-                if (squares[i].getPosition() == stoppedSquares[j].getPosition()) {
-                    return true;
-                }
-            }
-
-            if (squares[i].getPosition().y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-
-            if (squares[i].getPosition().x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
-                squares[i].getPosition().x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
-                return true;
-            }
-        }
-        return false;
+        return CheckCollisionCommon(squares, stoppedSquares, sf::Vector2f(0, 0));
     }
 };
 
