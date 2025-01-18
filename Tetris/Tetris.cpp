@@ -54,31 +54,31 @@ public:
 
     bool MoveDownCommon(std::vector<Square>& squares, sf::Vector2f& currentSquarePosition, std::vector<Square>& stoppedSquares) {
         currentSquarePosition += sf::Vector2f(0, 1);
-        bool isCollisionHappened = false;
+        bool isCollisionHappend = false;
         if (currentSquarePosition.y - squares[0].getPosition().y >= SQUARE_SIDE_LENGTH) {
-            isCollisionHappened = CheckCollision(stoppedSquares, sf::Vector2f(0, SQUARE_SIDE_LENGTH));
-            if (!isCollisionHappened) {
-                for (auto& square : squares) {
-                    square.setPosition(square.getPosition() + sf::Vector2f(0, SQUARE_SIDE_LENGTH));
+            isCollisionHappend = CheckCollision(stoppedSquares, sf::Vector2f(0, SQUARE_SIDE_LENGTH));
+            if (!isCollisionHappend) {
+                for (int i = 0; i < squares.size(); i++) {
+                    squares[i].setPosition(squares[i].getPosition() + sf::Vector2f(0, SQUARE_SIDE_LENGTH));
                 }
             }
             currentSquarePosition = squares[0].getPosition();
         }
-        return isCollisionHappened;
+        return isCollisionHappend;
     }
 
     bool CheckCollisionCommon(std::vector<Square>& squares, std::vector<Square>& stoppedSquares, sf::Vector2f offset) {
-        for (const auto& square : squares) {
-            for (const auto& stoppedSquare : stoppedSquares) {
-                if (square.getPosition() + offset == stoppedSquare.getPosition()) {
+        for (int i = 0; i < squares.size(); i++) {
+            for (int j = 0; j < stoppedSquares.size(); j++) {
+                if (squares[i].getPosition() + offset == stoppedSquares[j].getPosition()) {
                     return true;
                 }
             }
-            if (square.getPosition().y + offset.y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
+            if (squares[i].getPosition().y + offset.y == TOP_OFFSET_FOR_PLAYING_AREA + TOP_OFFSET_FOR_SQUARE_MATRIX + 20 * SQUARE_SIDE_LENGTH) {
                 return true;
             }
-            if (square.getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
-                square.getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
+            if (squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX - SQUARE_SIDE_LENGTH ||
+                squares[i].getPosition().x + offset.x == LEFT_OFFSET_FOR_PLAYING_AREA + LEFT_OFFSET_FOR_SQUARE_MATRIX + 10 * SQUARE_SIDE_LENGTH) {
                 return true;
             }
         }
@@ -98,8 +98,8 @@ public:
         for (int i = 0; i < offsetDuringRotation.size(); i++) {
             for (int j = 0; j < maxQuantityEnteredSquareCollisions; j++) {
                 if (CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
-                    for (auto& spinedSquare : spinedSquares) {
-                        spinedSquare.setPosition(spinedSquare.getPosition() + offsetDuringRotation[i]);
+                    for (int k = 0; k < spinedSquares.size(); k++) {
+                        spinedSquares[k].setPosition(spinedSquares[k].getPosition() + offsetDuringRotation[i]);
                     }
                     if (!CheckCollisionForSpin(spinedSquares, stoppedSquares)) {
                         squares = spinedSquares;
@@ -113,8 +113,8 @@ public:
                     return;
                 }
             }
-            for (auto& spinedSquare : spinedSquares) {
-                spinedSquare.setPosition(spinedSquare.getPosition() - sf::Vector2f(maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].x, maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].y));
+            for (int k = 0; k < spinedSquares.size(); k++) {
+                spinedSquares[k].setPosition(spinedSquares[k].getPosition() - sf::Vector2f(maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].x, maxQuantityEnteredSquareCollisions * offsetDuringRotation[i].y));
             }
         }
     }
